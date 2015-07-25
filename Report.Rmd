@@ -1,23 +1,22 @@
 ---
 title: "Practical Machine Learning Assignment"
-author: "Graham Parsons"
 date: "July 2015"
 output: html_document
 ---
 
+# Introduction
+The purpose of this assignment is to build a model that accurately predicts the performance of weight lifters performing barbell lifts. The training data consists of measurements of various accelerometers strapped to the lifter:  19,622 observations of 160 variables. The `classe` variable is the target variable for prediction and is a categorical variable taking values from A to E, where A corresponds to a correct lifting technique and D to E correspond to variations of incorrect techniques.
+
+# Data Preparation
 
 ```{r setup, message = FALSE, warning= FALSE}
 library(caret)  # for model building
 library(dplyr)  # for sample_frac
 library(doMC)  # for multicore processing
 library(readr)  # for fast text file reading
+library(knitr)  # for kable table formatting
 registerDoMC(cores = 3)  # Register both cores for parallel processing
 ```
-
-# Introduction
-The purpose of this assignment is to build a model that accurately predicts the performance of weight lifters performing barbell lifts. The training data consists of measurements of various accelerometers strapped to the lifter:  19,622 observations of 160 variables. The `classe` variable is the target variable for prediction and is a categorical variable taking values from A to E, where A corresponds to a correct lifting technique and D to E correspond to variations of incorrect techniques.
-
-# Data Preparation
 
 ```{r read_dataset, message=FALSE, warning=FALSE}
 # Specify column types in advance (using shorthand readr format)
@@ -85,9 +84,9 @@ cm1 <- confusionMatrix(test$classe, predict(rf1, test))
 kable(cm1$table)
 ```
 
-An estimate of the model accuracy based on the hold-out set is `cm$overall[['Accuracy']]`:
+An estimate of the model accuracy based on the hold-out set is `r round(cm1$overall[['Accuracy']], 3)`:
 ```{r accuracy, message=FALSE, warning=FALSE}
-accuracy <- cm$overall[['Accuracy']]
+accuracy <- cm1$overall[['Accuracy']]
 accuracy
 ```
 

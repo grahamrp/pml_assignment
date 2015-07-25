@@ -10,7 +10,7 @@ registerDoMC(cores = 3)  # Register both cores for parallel processing
 # Specify column types in advance (using shorthand readr format)
 coltypes <- paste0('ccddccc', paste(rep('d', 152), collapse = ''), 'c')
 training <- read_csv('data/pml-training.csv', col_types = coltypes)
-#testing <- read_csv('data/pml-testing.csv', col_types = coltypes)
+
 rm(coltypes)
 #probs <- problems(training)
 
@@ -26,8 +26,9 @@ clean_data <- function(df){
   keep <- names(df) %in% names(prop_na[prop_na > 0.9])
   df <- df[, !keep]
   # Convert columns to factors
-  df$user_name <- as.factor(df$user_name)
-  df$classe <- as.factor(df$class)
+  if('classe' %in% names(df)){  # (classe is not in test set)
+    df$classe <- as.factor(df$class)
+  }
   df
 }
 training <- clean_data(training)
@@ -66,3 +67,16 @@ test_pc <- predict(pre_proc, test[, 8:59])
 confusionMatrix(test$classe, predict(rf1, test_pc))
 cm <- confusionMatrix(test$classe, predict(rf2, test))
 
+# --- Predict classe for testing dataset ---------------------------------------
+testing <- read_csv('data/pml-testing.csv', col_types = coltypes)
+testing <- clean_data(testing)
+
+answers <- as.character(predict(rf2, testing))
+pml_write_files <- function(x){
+  n <- length(x)
+  for(i in 1:n){
+    filename <- paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(answers)
