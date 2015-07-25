@@ -1,0 +1,94 @@
+---
+title: "Practical Machine Learning Assignment"
+author: "Graham Parsons"
+date: "July 2015"
+output: html_document
+---
+
+
+```{r setup, message = FALSE, warning= FALSE}
+library(caret)  # for model building
+library(dplyr)  # for sample_frac
+library(doMC)  # for multicore processing
+library(readr)  # for fast text file reading
+registerDoMC(cores = 3)  # Register both cores for parallel processing
+```
+
+# Introduction
+The purpose of this assignment is to build a model that accurately predicts the performance of weight lifters performing barbell lifts. The training data consists of measurements of various accelerometers strapped to the lifter:  19,622 observations of 160 variables. The `classe` variable is the target variable for prediction and is a categorical variable taking values from A to E, where A corresponds to a correct lifting technique and D to E correspond to variations of incorrect techniques.
+
+# Data Preparation
+
+```{r read_dataset, message=FALSE, warning=FALSE}
+# Specify column types in advance (using shorthand readr format)
+# (c)haracter, (d)ouble
+coltypes <- paste0('ccddccc', paste(rep('d', 152), collapse = ''), 'c')
+training <- read_csv('data/pml-training.csv', col_types = coltypes)
+```
+Although the dataset consists of `r ncol(training)` columns of measurements, many of these columns contain high proportions of missing values. Approximately two thirds of the measurements in the dataset are missing.
+
+The "missingness map" in the figure below illustrates this. The map shows column names on the x-axis and rows on the y-axis, with each cell coloured by its missingness status. The map is constructed on a 10% sample of the dataset for speed.
+
+```{r missmap, message=FALSE, warning=FALSE, fig.width=8, fig.height=6, cache=TRUE }
+# Plot missingness map and reduce the size of the axis labels
+Amelia::missmap(sample_frac(training, size = 0.1), 
+                y.cex = 0.2, x.cex = 0.5)
+```
+
+Although not *every* value is missing from these sparsely-populated columns it seems pragmatic to remove them and focus on the well-populated fields, if only for model-building performance reasons. Therefore these columns were removed from the dataset.
+
+```{r remove_cols, message=FALSE, warning=FALSE}
+# Remove columns with huge proportion of missing values
+# Calculate proportion of missing values in each column
+prop_na <- sapply(training, function(x) {sum(is.na(x)) / length(x)})
+# Remove columns with more than 90% missing values
+to_drop <- names(training) %in% names(prop_na[prop_na > 0.9])
+training <- training[, !to_drop]
+```
+
+The `classe` column was then converted into a factor with the expectation that the machine learning methods will prefer it.
+```{r to_factor, message=FALSE, warning=FALSE}
+training$classe <- as.factor(training$class)
+```
+
+# Creating Test and Train Datasets
+
+In order to get a more accurate estimate of the predictive accuracy of the final model, the training data was divided into a `train` set and a `test` set. Models were trained on just the `train` dataset, with the hold-out `test` dataset used to assess performance on new data. 70% of the data was allocated to `train` and the remaining 30% allocated to `test`.
+
+```{r split_data, message=FALSE, warning=FALSE}
+# Split data into train and test
+in_train <- createDataPartition(y = training$classe, p = 0.7, list = FALSE)
+train <- training[in_train, ]
+test <- training[-in_train, ]
+```
+
+# Model Building
+
+Although several models were tried, the random forest algorithm did a very good job of classifying the `classe` variable from the measurement variables, and this is the model detailed below.
+
+Principal component analysis was tried in order to reduce the number of variables, but the resultant models produced less-accurate results, so the technique was not used in the final model.
+
+```{r build_model, message=FALSE, warning=FALSE, cache=TRUE}
+# Train a random forest classifier using just the measurement columns (8:59)
+rf1 <- train(train$classe ~.,
+             method = 'rf',
+             data = train[, 8:59])
+```
+
+# Assessing Model Accuracy
+
+Cross validation was used to assess the model accuracy, by testing the accuracy of the model on the hold-out `test` dataset, rather than the data used to train the model.
+
+```{r assess_model, message=FALSE, warning=FALSE}
+# Print confusion matrix of predictions on the test dataset
+cm1 <- confusionMatrix(test$classe, predict(rf1, test))
+kable(cm1$table)
+```
+
+An estimate of the model accuracy based on the hold-out set is `cm$overall[['Accuracy']]`:
+```{r accuracy, message=FALSE, warning=FALSE}
+accuracy <- cm$overall[['Accuracy']]
+accuracy
+```
+
+Or in other words, the out-of-sample error rate is estimated to be `1 - accuracy`, i.e. `r round(1 - accuracy, 3)`.
